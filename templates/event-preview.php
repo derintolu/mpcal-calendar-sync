@@ -49,16 +49,14 @@ if ( $template_event->is_all_day_event() && $event_start === $event_end ) {
 		$time_string = wp_date( 'l, F j', $template_event->get_start_in_wp_timezone()->getTimestamp() );
 }
 
-// Get add-to-calendar data
+// Get add-to-calendar links
 $event_group_id = $template_event->get_event_group_id();
-$atc_title      = get_post_meta( $event_group_id, '_mpcal_atc_title', true );
-$atc_start      = get_post_meta( $event_group_id, '_mpcal_atc_start', true );
-$atc_end        = get_post_meta( $event_group_id, '_mpcal_atc_end', true );
-$atc_allday     = get_post_meta( $event_group_id, '_mpcal_atc_allday', true );
-$atc_timezone   = get_post_meta( $event_group_id, '_mpcal_atc_timezone', true );
-$atc_location   = get_post_meta( $event_group_id, '_mpcal_atc_location', true );
-$atc_desc       = get_post_meta( $event_group_id, '_mpcal_atc_description', true );
-$has_atc        = ! empty( $atc_title ) && ! empty( $atc_start );
+$atc_google     = get_post_meta( $event_group_id, '_mpcal_atc_google', true );
+$atc_outlook    = get_post_meta( $event_group_id, '_mpcal_atc_outlook', true );
+$atc_office365  = get_post_meta( $event_group_id, '_mpcal_atc_office365', true );
+$atc_yahoo      = get_post_meta( $event_group_id, '_mpcal_atc_yahoo', true );
+$atc_ics        = get_post_meta( $event_group_id, '_mpcal_atc_ics', true );
+$has_atc        = ! empty( $atc_google ) || ! empty( $atc_outlook );
 ?>
 
 <div class="mpcal-event-preview">
@@ -123,29 +121,17 @@ $has_atc        = ! empty( $atc_title ) && ! empty( $atc_start );
 	</div>
 	<?php endif; ?>
 
-	<?php if ( $has_atc ) :
-		$start_date = date( 'Y-m-d', strtotime( $atc_start ) );
-		$end_date   = date( 'Y-m-d', strtotime( $atc_end ) );
-		$start_time = ( '1' !== $atc_allday ) ? date( 'H:i', strtotime( $atc_start ) ) : '';
-		$end_time   = ( '1' !== $atc_allday ) ? date( 'H:i', strtotime( $atc_end ) ) : '';
-	?>
+	<?php if ( $has_atc ) : ?>
 	<div class="mpcal-event-preview__row mpcal-event-preview__addtocal">
 		<div class="mpcal-event-preview__row-icon">
 			<i class="mcal-icon mcal-icon-calendar"></i>
 		</div>
-		<div class="mpcal-event-preview__row-content">
-			<add-to-calendar-button
-				name="<?php echo esc_attr( $atc_title ); ?>"
-				startDate="<?php echo esc_attr( $start_date ); ?>"
-				endDate="<?php echo esc_attr( $end_date ); ?>"
-				<?php if ( ! empty( $start_time ) ) : ?>startTime="<?php echo esc_attr( $start_time ); ?>" endTime="<?php echo esc_attr( $end_time ); ?>"<?php endif; ?>
-				timeZone="<?php echo esc_attr( $atc_timezone ?: 'America/Los_Angeles' ); ?>"
-				<?php if ( ! empty( $atc_location ) ) : ?>location="<?php echo esc_attr( $atc_location ); ?>"<?php endif; ?>
-				<?php if ( ! empty( $atc_desc ) ) : ?>description="<?php echo esc_attr( wp_strip_all_tags( substr( $atc_desc, 0, 500 ) ) ); ?>"<?php endif; ?>
-				options="'Apple','Google','Outlook.com','Microsoft365','Yahoo','iCal'"
-				lightMode="bodyScheme"
-				size="3"
-			></add-to-calendar-button>
+		<div class="mpcal-event-preview__row-content mpcal-event-preview__atc-links">
+			<?php if ( ! empty( $atc_google ) ) : ?><a href="<?php echo esc_url( $atc_google ); ?>" target="_blank" rel="noopener">Google</a><?php endif; ?>
+			<?php if ( ! empty( $atc_office365 ) ) : ?><a href="<?php echo esc_url( $atc_office365 ); ?>" target="_blank" rel="noopener">Microsoft 365</a><?php endif; ?>
+			<?php if ( ! empty( $atc_outlook ) ) : ?><a href="<?php echo esc_url( $atc_outlook ); ?>" target="_blank" rel="noopener">Outlook</a><?php endif; ?>
+			<?php if ( ! empty( $atc_yahoo ) ) : ?><a href="<?php echo esc_url( $atc_yahoo ); ?>" target="_blank" rel="noopener">Yahoo</a><?php endif; ?>
+			<?php if ( ! empty( $atc_ics ) ) : ?><a href="<?php echo esc_url( $atc_ics ); ?>" target="_blank" rel="noopener">iCal</a><?php endif; ?>
 		</div>
 	</div>
 	<?php endif; ?>

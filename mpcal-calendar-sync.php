@@ -1190,68 +1190,72 @@ function init_plugin(): void {
 		 * Enqueue add-to-calendar button assets.
 		 */
 		public function enqueue_addtocal_styles(): void {
-			wp_enqueue_script(
-				'add-to-calendar-button',
-				plugins_url( 'assets/js/atcb.js', __FILE__ ),
-				array(),
-				'1.0.0',
-				array( 'strategy' => 'defer', 'in_footer' => true )
-			);
-			add_filter( 'script_loader_tag', function ( $tag, $handle ) {
-				if ( 'add-to-calendar-button' === $handle ) {
-					return str_replace( '<script ', '<script type="module" ', $tag );
-				}
-				return $tag;
-			}, 10, 2 );
+			if ( ! is_singular( 'mpcal_event_group' ) ) {
+				return;
+			}
+			wp_add_inline_style( 'wp-block-library', $this->get_addtocal_css() );
+			wp_add_inline_script( 'wp-block-library', $this->get_addtocal_js(), 'after' );
 		}
 
 		/**
-		 * Render add-to-calendar button (web component).
+		 * Render add-to-calendar dropdown button.
 		 */
 		public function render_addtocal_buttons( int $event_group_id ): string {
-			$title       = get_post_meta( $event_group_id, '_mpcal_atc_title', true );
-			$description = get_post_meta( $event_group_id, '_mpcal_atc_description', true );
-			$location    = get_post_meta( $event_group_id, '_mpcal_atc_location', true );
-			$start       = get_post_meta( $event_group_id, '_mpcal_atc_start', true );
-			$end         = get_post_meta( $event_group_id, '_mpcal_atc_end', true );
-			$allday      = get_post_meta( $event_group_id, '_mpcal_atc_allday', true );
-			$timezone    = get_post_meta( $event_group_id, '_mpcal_atc_timezone', true );
+			$google    = get_post_meta( $event_group_id, '_mpcal_atc_google', true );
+			$outlook   = get_post_meta( $event_group_id, '_mpcal_atc_outlook', true );
+			$office365 = get_post_meta( $event_group_id, '_mpcal_atc_office365', true );
+			$yahoo     = get_post_meta( $event_group_id, '_mpcal_atc_yahoo', true );
+			$ics       = get_post_meta( $event_group_id, '_mpcal_atc_ics', true );
 
-			if ( empty( $title ) || empty( $start ) ) {
+			if ( empty( $google ) && empty( $outlook ) ) {
 				return '';
 			}
 
-			$start_date = date( 'Y-m-d', strtotime( $start ) );
-			$end_date   = date( 'Y-m-d', strtotime( $end ) );
-			$start_time = ( '1' !== $allday ) ? date( 'H:i', strtotime( $start ) ) : '';
-			$end_time   = ( '1' !== $allday ) ? date( 'H:i', strtotime( $end ) ) : '';
+			$html = '<div class="mpcal-atc-wrap">';
+			$html .= '<button type="button" class="mpcal-atc-btn" onclick="this.parentElement.classList.toggle(\'open\')">';
+			$html .= '<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>';
+			$html .= ' Add to Calendar</button>';
+			$html .= '<div class="mpcal-atc-dropdown">';
 
-			$attrs = sprintf(
-				'name="%s" startDate="%s" endDate="%s" timeZone="%s" options="\'Apple\',\'Google\',\'Outlook.com\',\'Microsoft365\',\'Yahoo\',\'iCal\'" lightMode="bodyScheme"',
-				esc_attr( $title ),
-				esc_attr( $start_date ),
-				esc_attr( $end_date ),
-				esc_attr( $timezone ?: 'America/Los_Angeles' )
-			);
-
-			if ( ! empty( $start_time ) ) {
-				$attrs .= sprintf( ' startTime="%s" endTime="%s"', esc_attr( $start_time ), esc_attr( $end_time ) );
+			if ( ! empty( $google ) ) {
+				$html .= '<a href="' . esc_url( $google ) . '" target="_blank" rel="noopener">Google Calendar</a>';
 			}
-			if ( ! empty( $description ) ) {
-				$attrs .= sprintf( ' description="%s"', esc_attr( wp_strip_all_tags( substr( $description, 0, 500 ) ) ) );
+			if ( ! empty( $office365 ) ) {
+				$html .= '<a href="' . esc_url( $office365 ) . '" target="_blank" rel="noopener">Microsoft 365</a>';
 			}
-			if ( ! empty( $location ) ) {
-				$attrs .= sprintf( ' location="%s"', esc_attr( $location ) );
+			if ( ! empty( $outlook ) ) {
+				$html .= '<a href="' . esc_url( $outlook ) . '" target="_blank" rel="noopener">Outlook.com</a>';
+			}
+			if ( ! empty( $yahoo ) ) {
+				$html .= '<a href="' . esc_url( $yahoo ) . '" target="_blank" rel="noopener">Yahoo Calendar</a>';
+			}
+			if ( ! empty( $ics ) ) {
+				$html .= '<a href="' . esc_url( $ics ) . '" target="_blank" rel="noopener">Apple / iCal</a>';
 			}
 
-			return '<div class="mpcal-addtocal"><add-to-calendar-button ' . $attrs . '></add-to-calendar-button></div>';
+			$html .= '</div></div>';
+			return $html;
 		}
 
 		/**
-		 * Get CSS for add-to-calendar wrapper.
+		 * Get CSS for add-to-calendar dropdown.
 		 */
 		private function get_addtocal_css(): string {
-			return '.mpcal-addtocal { margin: 1.5em 0; }';
+			return '
+.mpcal-atc-wrap{position:relative;display:inline-block;margin:1.5em 0;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif}
+.mpcal-atc-btn{display:inline-flex;align-items:center;gap:6px;padding:10px 18px;background:#1a73e8;color:#fff;border:none;border-radius:6px;font-size:14px;font-weight:500;cursor:pointer;transition:background .2s}
+.mpcal-atc-btn:hover{background:#1557b0}
+.mpcal-atc-dropdown{display:none;position:absolute;top:100%;left:0;margin-top:4px;min-width:180px;background:#fff;border-radius:8px;box-shadow:0 4px 16px rgba(0,0,0,.15);z-index:100;overflow:hidden}
+.mpcal-atc-wrap.open .mpcal-atc-dropdown{display:block}
+.mpcal-atc-dropdown a{display:block;padding:10px 16px;color:#333;text-decoration:none;font-size:14px;transition:background .15s}
+.mpcal-atc-dropdown a:hover{background:#f0f4ff;color:#1a73e8}';
+		}
+
+		/**
+		 * Get JS for closing dropdown on outside click.
+		 */
+		private function get_addtocal_js(): string {
+			return 'document.addEventListener("click",function(e){document.querySelectorAll(".mpcal-atc-wrap.open").forEach(function(w){if(!w.contains(e.target))w.classList.remove("open")})});';
 		}
 
 		// ==================== AJAX HANDLERS ====================
