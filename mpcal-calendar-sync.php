@@ -139,7 +139,7 @@ function init_plugin(): void {
 			add_filter( 'cron_schedules', array( $this, 'add_cron_schedules' ) );
 
 			// Add-to-Calendar buttons on event display
-			add_filter( 'the_content', array( $this, 'append_addtocal_buttons' ), 20 );
+			add_filter( 'render_block_motopress-calendar/event-schedule', array( $this, 'append_addtocal_buttons_to_block' ), 10, 2 );
 			add_filter( 'mpcal_template_filepath', array( $this, 'override_event_preview_template' ), 10, 2 );
 			add_action( 'wp_enqueue_scripts', array( $this, 'enqueue_addtocal_styles' ) );
 
@@ -1151,21 +1151,21 @@ function init_plugin(): void {
 		// ==================== ADD TO CALENDAR DISPLAY ====================
 
 		/**
-		 * Append add-to-calendar buttons to event group content.
+		 * Append add-to-calendar buttons after the event-schedule block output.
 		 */
-		public function append_addtocal_buttons( string $content ): string {
+		public function append_addtocal_buttons_to_block( string $block_content, array $block ): string {
 			if ( ! is_singular( 'mpcal_event_group' ) ) {
-				return $content;
+				return $block_content;
 			}
 
 			$post_id = get_the_ID();
 			$buttons = $this->render_addtocal_buttons( $post_id );
 
 			if ( empty( $buttons ) ) {
-				return $content;
+				return $block_content;
 			}
 
-			return $content . $buttons;
+			return $block_content . $buttons;
 		}
 
 		/**
