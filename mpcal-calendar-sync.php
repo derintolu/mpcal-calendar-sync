@@ -138,6 +138,9 @@ function init_plugin(): void {
 			add_action( 'mpcal_ics_sync_cron', array( $this, 'run_scheduled_sync' ) );
 			add_filter( 'cron_schedules', array( $this, 'add_cron_schedules' ) );
 
+			// Show full excerpt with HTML on event group pages
+			add_filter( 'get_the_excerpt', array( $this, 'event_group_full_excerpt' ), 10, 2 );
+
 			// REST API caching for events endpoint
 			add_filter( 'rest_pre_dispatch', array( $this, 'maybe_serve_cached_events' ), 10, 3 );
 			add_filter( 'rest_post_dispatch', array( $this, 'maybe_cache_events_response' ), 10, 3 );
@@ -506,8 +509,19 @@ function init_plugin(): void {
 					// Get title
 					$title = ! empty( $vevent->SUMMARY ) ? (string) $vevent->SUMMARY : 'Untitled Event';
 
-					// Get description — auto-link URLs so they're clickable
+					// Get description — extract meeting URL and auto-link remaining URLs
 					$description = ! empty( $vevent->DESCRIPTION ) ? (string) $vevent->DESCRIPTION : '';
+					$meeting_url = '';
+
+					// Extract Zoom/Teams/Meet URLs before escaping
+					if ( preg_match( '~(https?://(?:[a-z0-9]+\.)?(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com)/[^\s]+)~i', $description, $m ) ) {
+						$meeting_url = trim( $m[1] );
+						// Remove the meeting URL line from description so it's not duplicated
+						$description = preg_replace( '~\s*(?:Zoom Link:\s*)?(?:Join Zoom Meeting\s*)?(?:https?://(?:[a-z0-9]+\.)?(?:zoom\.us|teams\.microsoft\.com|meet\.google\.com)/[^\s]+)\s*~i', "\n", $description );
+						$description = trim( $description );
+					}
+
+					// Auto-link remaining URLs
 					$description = preg_replace(
 						'~(https?://[^\s<]+)~i',
 						'<a href="$1" target="_blank" rel="noopener">$1</a>',
@@ -592,7 +606,13 @@ function init_plugin(): void {
 						}
 					}
 
-					// URL - store for later use (don't use CUSTOM_URL type as it makes event private)
+					// Meeting URL → set as event page link so "View Event" links to Zoom/Meet
+					if ( ! empty( $meeting_url ) ) {
+						$event_data->set_event_page_type( Event_Page_Type::CUSTOM_URL() );
+						$event_data->set_event_page_custom_url( $meeting_url );
+					}
+
+					// URL from ICS
 					$event_url = '';
 					if ( ! empty( $vevent->URL ) ) {
 						$event_url = (string) $vevent->URL;
@@ -978,6 +998,18 @@ function init_plugin(): void {
 					$this->sync_feed( $feed_id );
 				}
 			}
+		}
+
+		/**
+		 * Return full excerpt with HTML for event group posts.
+		 * WordPress default strips HTML and truncates to 55 words.
+		 */
+		public function event_group_full_excerpt( string $excerpt, \WP_Post $post ): string {
+			if ( 'mpcal_event_group' !== $post->post_type ) {
+				return $excerpt;
+			}
+
+			return wp_kses_post( $post->post_excerpt );
 		}
 
 		// ==================== AJAX HANDLERS ====================
