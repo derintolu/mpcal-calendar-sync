@@ -634,6 +634,19 @@ function init_plugin(): void {
 						++$updated;
 					}
 
+					// Ensure excerpt block is in the event group template
+					$group_post = get_post( $event_group_id );
+					if ( $group_post && false === strpos( $group_post->post_content, 'wp:post-excerpt' ) ) {
+						wp_update_post( array(
+							'ID'           => $event_group_id,
+							'post_content' => str_replace(
+								'<!-- wp:motopress-calendar/event-date /-->',
+								'<!-- wp:motopress-calendar/event-date /--> <!-- wp:post-excerpt /-->',
+								$group_post->post_content
+							),
+						) );
+					}
+
 					// Store event URL if available
 					if ( ! empty( $event_url ) && filter_var( $event_url, FILTER_VALIDATE_URL ) ) {
 						update_post_meta( $event_group_id, '_mpcal_event_url', $event_url );
