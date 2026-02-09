@@ -1187,168 +1187,71 @@ function init_plugin(): void {
 		}
 
 		/**
-		 * Enqueue add-to-calendar button styles.
+		 * Enqueue add-to-calendar button assets.
 		 */
 		public function enqueue_addtocal_styles(): void {
-			wp_add_inline_style( 'wp-block-library', $this->get_addtocal_css() );
+			wp_enqueue_script(
+				'add-to-calendar-button',
+				plugins_url( 'assets/js/atcb.js', __FILE__ ),
+				array(),
+				'1.0.0',
+				array( 'strategy' => 'defer', 'in_footer' => true )
+			);
+			add_filter( 'script_loader_tag', function ( $tag, $handle ) {
+				if ( 'add-to-calendar-button' === $handle ) {
+					return str_replace( '<script ', '<script type="module" ', $tag );
+				}
+				return $tag;
+			}, 10, 2 );
 		}
 
 		/**
-		 * Render add-to-calendar buttons HTML.
+		 * Render add-to-calendar button (web component).
 		 */
 		public function render_addtocal_buttons( int $event_group_id ): string {
-			$google    = get_post_meta( $event_group_id, '_mpcal_atc_google', true );
-			$outlook   = get_post_meta( $event_group_id, '_mpcal_atc_outlook', true );
-			$office365 = get_post_meta( $event_group_id, '_mpcal_atc_office365', true );
-			$yahoo     = get_post_meta( $event_group_id, '_mpcal_atc_yahoo', true );
-			$ics       = get_post_meta( $event_group_id, '_mpcal_atc_ics', true );
+			$title       = get_post_meta( $event_group_id, '_mpcal_atc_title', true );
+			$description = get_post_meta( $event_group_id, '_mpcal_atc_description', true );
+			$location    = get_post_meta( $event_group_id, '_mpcal_atc_location', true );
+			$start       = get_post_meta( $event_group_id, '_mpcal_atc_start', true );
+			$end         = get_post_meta( $event_group_id, '_mpcal_atc_end', true );
+			$allday      = get_post_meta( $event_group_id, '_mpcal_atc_allday', true );
+			$timezone    = get_post_meta( $event_group_id, '_mpcal_atc_timezone', true );
 
-			if ( empty( $google ) && empty( $ics ) ) {
+			if ( empty( $title ) || empty( $start ) ) {
 				return '';
 			}
 
-			ob_start();
-			?>
-			<div class="mpcal-addtocal">
-				<span class="mpcal-addtocal__label"><?php esc_html_e( 'Add to Calendar:', 'mpcal-ics-sync' ); ?></span>
-				<div class="mpcal-addtocal__buttons">
-					<?php if ( ! empty( $google ) ) : ?>
-						<a href="<?php echo esc_url( $google ); ?>" target="_blank" rel="noopener noreferrer" class="mpcal-addtocal__btn mpcal-addtocal__btn--google" title="<?php esc_attr_e( 'Add to Google Calendar', 'mpcal-ics-sync' ); ?>">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 22C6.477 22 2 17.523 2 12S6.477 2 12 2s10 4.477 10 10-4.477 10-10 10zm-.998-16v5.586l3.535 3.536 1.415-1.415-2.95-2.95V6h-2z"/></svg>
-							<span>Google</span>
-						</a>
-					<?php endif; ?>
-					<?php if ( ! empty( $outlook ) ) : ?>
-						<a href="<?php echo esc_url( $outlook ); ?>" target="_blank" rel="noopener noreferrer" class="mpcal-addtocal__btn mpcal-addtocal__btn--outlook" title="<?php esc_attr_e( 'Add to Outlook.com', 'mpcal-ics-sync' ); ?>">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M7 3h10a4 4 0 0 1 4 4v10a4 4 0 0 1-4 4H7a4 4 0 0 1-4-4V7a4 4 0 0 1 4-4zm5 4a5 5 0 1 0 0 10 5 5 0 0 0 0-10zm0 2a3 3 0 1 1 0 6 3 3 0 0 1 0-6z"/></svg>
-							<span>Outlook</span>
-						</a>
-					<?php endif; ?>
-					<?php if ( ! empty( $office365 ) ) : ?>
-						<a href="<?php echo esc_url( $office365 ); ?>" target="_blank" rel="noopener noreferrer" class="mpcal-addtocal__btn mpcal-addtocal__btn--office365" title="<?php esc_attr_e( 'Add to Office 365', 'mpcal-ics-sync' ); ?>">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M3 5.5L10.5 4v16L3 18.5V5.5zm9-2.5l9 1.5v15l-9 1.5V3z"/></svg>
-							<span>Office 365</span>
-						</a>
-					<?php endif; ?>
-					<?php if ( ! empty( $yahoo ) ) : ?>
-						<a href="<?php echo esc_url( $yahoo ); ?>" target="_blank" rel="noopener noreferrer" class="mpcal-addtocal__btn mpcal-addtocal__btn--yahoo" title="<?php esc_attr_e( 'Add to Yahoo Calendar', 'mpcal-ics-sync' ); ?>">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 17.93c-3.94-.49-7-3.85-7-7.93s3.05-7.44 7-7.93v15.86zm2-15.86c3.94.49 7 3.85 7 7.93s-3.05 7.44-7 7.93V4.07z"/></svg>
-							<span>Yahoo</span>
-						</a>
-					<?php endif; ?>
-					<?php if ( ! empty( $ics ) ) : ?>
-						<a href="<?php echo esc_url( $ics ); ?>" target="_blank" rel="noopener noreferrer" class="mpcal-addtocal__btn mpcal-addtocal__btn--ics" title="<?php esc_attr_e( 'Download ICS file (Apple Calendar, etc.)', 'mpcal-ics-sync' ); ?>">
-							<svg width="18" height="18" viewBox="0 0 24 24" fill="currentColor"><path d="M19 3h-1V1h-2v2H8V1H6v2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 16H5V8h14v11z"/></svg>
-							<span>iCal</span>
-						</a>
-					<?php endif; ?>
-				</div>
-			</div>
-			<?php
-			return ob_get_clean();
+			$start_date = date( 'Y-m-d', strtotime( $start ) );
+			$end_date   = date( 'Y-m-d', strtotime( $end ) );
+			$start_time = ( '1' !== $allday ) ? date( 'H:i', strtotime( $start ) ) : '';
+			$end_time   = ( '1' !== $allday ) ? date( 'H:i', strtotime( $end ) ) : '';
+
+			$attrs = sprintf(
+				'name="%s" startDate="%s" endDate="%s" timeZone="%s" options="\'Apple\',\'Google\',\'Outlook.com\',\'Microsoft365\',\'Yahoo\',\'iCal\'" lightMode="bodyScheme"',
+				esc_attr( $title ),
+				esc_attr( $start_date ),
+				esc_attr( $end_date ),
+				esc_attr( $timezone ?: 'America/Los_Angeles' )
+			);
+
+			if ( ! empty( $start_time ) ) {
+				$attrs .= sprintf( ' startTime="%s" endTime="%s"', esc_attr( $start_time ), esc_attr( $end_time ) );
+			}
+			if ( ! empty( $description ) ) {
+				$attrs .= sprintf( ' description="%s"', esc_attr( wp_strip_all_tags( substr( $description, 0, 500 ) ) ) );
+			}
+			if ( ! empty( $location ) ) {
+				$attrs .= sprintf( ' location="%s"', esc_attr( $location ) );
+			}
+
+			return '<div class="mpcal-addtocal"><add-to-calendar-button ' . $attrs . '></add-to-calendar-button></div>';
 		}
 
 		/**
-		 * Get CSS for add-to-calendar buttons.
+		 * Get CSS for add-to-calendar wrapper.
 		 */
 		private function get_addtocal_css(): string {
-			return '
-				.mpcal-addtocal {
-					margin: 1.5em 0;
-					padding: 1em;
-					background: #f8f9fa;
-					border-radius: 8px;
-				}
-				.mpcal-addtocal__label {
-					display: block;
-					font-weight: 600;
-					margin-bottom: 0.75em;
-					font-size: 0.9em;
-					color: #333;
-				}
-				.mpcal-addtocal__buttons {
-					display: flex;
-					flex-wrap: wrap;
-					gap: 0.5em;
-				}
-				.mpcal-addtocal__btn {
-					display: inline-flex;
-					align-items: center;
-					gap: 0.4em;
-					padding: 0.5em 1em;
-					font-size: 0.85em;
-					font-weight: 500;
-					text-decoration: none;
-					border-radius: 6px;
-					transition: all 0.2s ease;
-					border: 1px solid transparent;
-				}
-				.mpcal-addtocal__btn svg {
-					flex-shrink: 0;
-				}
-				.mpcal-addtocal__btn--google {
-					background: #4285f4;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--google:hover {
-					background: #3367d6;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--outlook {
-					background: #0078d4;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--outlook:hover {
-					background: #106ebe;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--office365 {
-					background: #d83b01;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--office365:hover {
-					background: #b83301;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--yahoo {
-					background: #720e9e;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--yahoo:hover {
-					background: #5a0b7e;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--ics {
-					background: #333;
-					color: #fff;
-				}
-				.mpcal-addtocal__btn--ics:hover {
-					background: #000;
-					color: #fff;
-				}
-				/* Event preview popup styles */
-				.mpcal-event-preview .mpcal-addtocal {
-					margin: 0.75em 0 0;
-					padding: 0.75em;
-					background: #f0f0f0;
-				}
-				.mpcal-event-preview .mpcal-addtocal__label {
-					font-size: 0.8em;
-					margin-bottom: 0.5em;
-				}
-				.mpcal-event-preview .mpcal-addtocal__btn {
-					padding: 0.35em 0.7em;
-					font-size: 0.75em;
-				}
-				.mpcal-event-preview .mpcal-addtocal__btn span {
-					display: none;
-				}
-				@media (min-width: 600px) {
-					.mpcal-event-preview .mpcal-addtocal__btn span {
-						display: inline;
-					}
-				}
-			';
+			return '.mpcal-addtocal { margin: 1.5em 0; }';
 		}
 
 		// ==================== AJAX HANDLERS ====================
