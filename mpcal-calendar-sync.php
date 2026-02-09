@@ -1110,7 +1110,7 @@ function init_plugin(): void {
 			$wp_tz    = wp_timezone();
 			$now      = new \DateTime( 'now', $wp_tz );
 			$result   = \Motopress_Calendar\Core\Event_Search_Helper::find_upcoming_group_events( $event_group_id, $now, 1 );
-			$events   = $result->get_events();
+			$events   = $result->get_items();
 			$event    = ! empty( $events ) ? $events[0] : null;
 
 			if ( null === $event ) {
