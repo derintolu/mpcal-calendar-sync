@@ -506,8 +506,13 @@ function init_plugin(): void {
 					// Get title
 					$title = ! empty( $vevent->SUMMARY ) ? (string) $vevent->SUMMARY : 'Untitled Event';
 
-					// Get description
+					// Get description — auto-link URLs so they're clickable
 					$description = ! empty( $vevent->DESCRIPTION ) ? (string) $vevent->DESCRIPTION : '';
+					$description = preg_replace(
+						'~(https?://[^\s<]+)~i',
+						'<a href="$1" target="_blank" rel="noopener">$1</a>',
+						esc_html( $description )
+					);
 
 					// Parse start/end times
 					$dtstart    = $vevent->DTSTART;
