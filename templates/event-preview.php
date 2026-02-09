@@ -49,14 +49,44 @@ if ( $template_event->is_all_day_event() && $event_start === $event_end ) {
 		$time_string = wp_date( 'l, F j', $template_event->get_start_in_wp_timezone()->getTimestamp() );
 }
 
-// Get add-to-calendar links
-$event_group_id = $template_event->get_event_group_id();
-$atc_google     = get_post_meta( $event_group_id, '_mpcal_atc_google', true );
-$atc_outlook    = get_post_meta( $event_group_id, '_mpcal_atc_outlook', true );
-$atc_office365  = get_post_meta( $event_group_id, '_mpcal_atc_office365', true );
-$atc_yahoo      = get_post_meta( $event_group_id, '_mpcal_atc_yahoo', true );
-$atc_ics        = get_post_meta( $event_group_id, '_mpcal_atc_ics', true );
-$has_atc        = ! empty( $atc_google ) || ! empty( $atc_outlook );
+// Build add-to-calendar links dynamically from event data
+$atc_title      = $template_event->get_event_group()->get_event_title();
+$atc_desc       = $template_event->get_event_group()->get_event_description();
+$atc_start      = $template_event->get_start_in_wp_timezone();
+$atc_end        = $template_event->get_end_in_wp_timezone();
+$atc_allday     = $template_event->is_all_day_event();
+$atc_location   = $template_event->get_event_location() ? $template_event->get_event_location()->get_title() : '';
+
+$atc_start_utc = clone $atc_start;
+$atc_start_utc->setTimezone( new \DateTimeZone( 'UTC' ) );
+$atc_end_utc = clone $atc_end;
+$atc_end_utc->setTimezone( new \DateTimeZone( 'UTC' ) );
+
+$atc_title_enc = rawurlencode( $atc_title );
+$atc_desc_enc  = rawurlencode( substr( wp_strip_all_tags( $atc_desc ), 0, 1000 ) );
+$atc_loc_enc   = rawurlencode( $atc_location );
+
+if ( $atc_allday ) {
+	$g_dates = $atc_start->format( 'Ymd' ) . '/' . ( clone $atc_end )->modify( '+1 day' )->format( 'Ymd' );
+	$o_start = $atc_start->format( 'Y-m-d' );
+	$o_end   = $atc_end->format( 'Y-m-d' );
+} else {
+	$g_dates = $atc_start_utc->format( 'Ymd\THis\Z' ) . '/' . $atc_end_utc->format( 'Ymd\THis\Z' );
+	$o_start = $atc_start_utc->format( 'Y-m-d\TH:i:s\Z' );
+	$o_end   = $atc_end_utc->format( 'Y-m-d\TH:i:s\Z' );
+}
+
+$atc_google    = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' . $atc_title_enc . '&dates=' . $g_dates . ( $atc_desc ? '&details=' . $atc_desc_enc : '' ) . ( $atc_location ? '&location=' . $atc_loc_enc : '' );
+$atc_office365 = 'https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=' . $atc_title_enc . '&startdt=' . rawurlencode( $o_start ) . '&enddt=' . rawurlencode( $o_end ) . ( $atc_allday ? '&allday=true' : '' ) . ( $atc_desc ? '&body=' . $atc_desc_enc : '' ) . ( $atc_location ? '&location=' . $atc_loc_enc : '' );
+$atc_outlook   = 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=' . $atc_title_enc . '&startdt=' . rawurlencode( $o_start ) . '&enddt=' . rawurlencode( $o_end ) . ( $atc_allday ? '&allday=true' : '' ) . ( $atc_desc ? '&body=' . $atc_desc_enc : '' ) . ( $atc_location ? '&location=' . $atc_loc_enc : '' );
+$atc_yahoo     = 'https://calendar.yahoo.com/?v=60&title=' . $atc_title_enc . '&st=' . ( $atc_allday ? $atc_start->format( 'Ymd' ) : $atc_start_utc->format( 'Ymd\THis\Z' ) ) . '&et=' . ( $atc_allday ? $atc_end->format( 'Ymd' ) : $atc_end_utc->format( 'Ymd\THis\Z' ) ) . ( $atc_allday ? '&dur=allday' : '' ) . ( $atc_desc ? '&desc=' . $atc_desc_enc : '' ) . ( $atc_location ? '&in_loc=' . $atc_loc_enc : '' );
+
+$ics_params = array( 'title' => $atc_title, 'start' => $atc_allday ? $atc_start->format( 'Y-m-d' ) : $atc_start_utc->format( 'Y-m-d\TH:i:s\Z' ), 'end' => $atc_allday ? $atc_end->format( 'Y-m-d' ) : $atc_end_utc->format( 'Y-m-d\TH:i:s\Z' ) );
+if ( $atc_desc )     $ics_params['description'] = substr( wp_strip_all_tags( $atc_desc ), 0, 500 );
+if ( $atc_location ) $ics_params['location'] = $atc_location;
+if ( $atc_allday )   $ics_params['allDay'] = 'true';
+$atc_ics = 'https://calndr.link/d/event/?' . http_build_query( $ics_params );
+$has_atc = true;
 ?>
 
 <div class="mpcal-event-preview">

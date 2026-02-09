@@ -634,19 +634,6 @@ function init_plugin(): void {
 						++$updated;
 					}
 
-					// Store add-to-calendar data on event group
-					$location_str = ! empty( $vevent->LOCATION ) ? (string) $vevent->LOCATION : '';
-					$this->store_addtocal_data(
-						$event_group_id,
-						$title,
-						$description,
-						$start_dt,
-						$end_dt,
-						$is_all_day,
-						$location_str,
-						$wp_timezone
-					);
-
 					// Store event URL if available
 					if ( ! empty( $event_url ) && filter_var( $event_url, FILTER_VALIDATE_URL ) ) {
 						update_post_meta( $event_group_id, '_mpcal_event_url', $event_url );
@@ -794,170 +781,65 @@ function init_plugin(): void {
 		}
 
 		/**
-		 * Store add-to-calendar data on event group for generating calendar links.
-		 * Generates links for Google, Outlook, Office 365, Yahoo, and ICS download.
+		 * Build calendar service URLs from event data.
 		 */
-		private function store_addtocal_data(
-			int $event_group_id,
-			string $title,
-			string $description,
-			\DateTime $start,
-			\DateTime $end,
-			bool $is_all_day,
-			string $location,
-			\DateTimeZone $timezone
-		): void {
-			// Format dates for different services
+		private function build_calendar_urls( string $title, string $description, \DateTime $start, \DateTime $end, bool $is_all_day, string $location ): array {
 			$start_utc = clone $start;
 			$start_utc->setTimezone( new \DateTimeZone( 'UTC' ) );
 			$end_utc = clone $end;
 			$end_utc->setTimezone( new \DateTimeZone( 'UTC' ) );
 
-			// Store raw data for dynamic link generation
-			update_post_meta( $event_group_id, '_mpcal_atc_title', $title );
-			update_post_meta( $event_group_id, '_mpcal_atc_description', $description );
-			update_post_meta( $event_group_id, '_mpcal_atc_location', $location );
-			update_post_meta( $event_group_id, '_mpcal_atc_start', $start->format( 'Y-m-d H:i:s' ) );
-			update_post_meta( $event_group_id, '_mpcal_atc_end', $end->format( 'Y-m-d H:i:s' ) );
-			update_post_meta( $event_group_id, '_mpcal_atc_start_utc', $start_utc->format( 'Ymd\THis\Z' ) );
-			update_post_meta( $event_group_id, '_mpcal_atc_end_utc', $end_utc->format( 'Ymd\THis\Z' ) );
-			update_post_meta( $event_group_id, '_mpcal_atc_allday', $is_all_day ? '1' : '0' );
-			update_post_meta( $event_group_id, '_mpcal_atc_timezone', $timezone->getName() );
+			$title_enc = rawurlencode( $title );
+			$desc_enc  = rawurlencode( substr( wp_strip_all_tags( $description ), 0, 1000 ) );
+			$loc_enc   = rawurlencode( $location );
 
-			// Generate and store links for each service
-			$links = $this->generate_addtocal_links(
-				$title,
-				$description,
-				$start,
-				$end,
-				$start_utc,
-				$end_utc,
-				$is_all_day,
-				$location,
-				$timezone
-			);
-
-			update_post_meta( $event_group_id, '_mpcal_atc_google', $links['google'] );
-			update_post_meta( $event_group_id, '_mpcal_atc_outlook', $links['outlook'] );
-			update_post_meta( $event_group_id, '_mpcal_atc_office365', $links['office365'] );
-			update_post_meta( $event_group_id, '_mpcal_atc_yahoo', $links['yahoo'] );
-			update_post_meta( $event_group_id, '_mpcal_atc_ics', $links['ics'] );
-		}
-
-		/**
-		 * Generate add-to-calendar links for various services.
-		 */
-		private function generate_addtocal_links(
-			string $title,
-			string $description,
-			\DateTime $start,
-			\DateTime $end,
-			\DateTime $start_utc,
-			\DateTime $end_utc,
-			bool $is_all_day,
-			string $location,
-			\DateTimeZone $timezone
-		): array {
-			$title_encoded = rawurlencode( $title );
-			$desc_encoded = rawurlencode( substr( $description, 0, 1000 ) ); // Limit description length
-			$location_encoded = rawurlencode( $location );
-			$tz_name = $timezone->getName();
-
-			// Date formats
 			if ( $is_all_day ) {
-				$google_dates = $start->format( 'Ymd' ) . '/' . $end->modify( '+1 day' )->format( 'Ymd' );
-				$end->modify( '-1 day' ); // Revert modification
-				$outlook_start = $start->format( 'Y-m-d' );
-				$outlook_end = $end->format( 'Y-m-d' );
+				$g_dates = $start->format( 'Ymd' ) . '/' . ( clone $end )->modify( '+1 day' )->format( 'Ymd' );
+				$o_start = $start->format( 'Y-m-d' );
+				$o_end   = $end->format( 'Y-m-d' );
 			} else {
-				$google_dates = $start_utc->format( 'Ymd\THis\Z' ) . '/' . $end_utc->format( 'Ymd\THis\Z' );
-				$outlook_start = $start_utc->format( 'Y-m-d\TH:i:s\Z' );
-				$outlook_end = $end_utc->format( 'Y-m-d\TH:i:s\Z' );
+				$g_dates = $start_utc->format( 'Ymd\THis\Z' ) . '/' . $end_utc->format( 'Ymd\THis\Z' );
+				$o_start = $start_utc->format( 'Y-m-d\TH:i:s\Z' );
+				$o_end   = $end_utc->format( 'Y-m-d\TH:i:s\Z' );
 			}
 
-			// Google Calendar
-			$google = 'https://calendar.google.com/calendar/render?action=TEMPLATE';
-			$google .= '&text=' . $title_encoded;
-			$google .= '&dates=' . $google_dates;
-			if ( ! empty( $description ) ) {
-				$google .= '&details=' . $desc_encoded;
-			}
-			if ( ! empty( $location ) ) {
-				$google .= '&location=' . $location_encoded;
-			}
+			// Google
+			$google = 'https://calendar.google.com/calendar/render?action=TEMPLATE&text=' . $title_enc . '&dates=' . $g_dates;
+			if ( $description ) $google .= '&details=' . $desc_enc;
+			if ( $location )    $google .= '&location=' . $loc_enc;
 
-			// Outlook.com (personal)
-			$outlook = 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent';
-			$outlook .= '&subject=' . $title_encoded;
-			$outlook .= '&startdt=' . rawurlencode( $outlook_start );
-			$outlook .= '&enddt=' . rawurlencode( $outlook_end );
-			if ( $is_all_day ) {
-				$outlook .= '&allday=true';
-			}
-			if ( ! empty( $description ) ) {
-				$outlook .= '&body=' . $desc_encoded;
-			}
-			if ( ! empty( $location ) ) {
-				$outlook .= '&location=' . $location_encoded;
-			}
+			// Outlook.com
+			$outlook = 'https://outlook.live.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=' . $title_enc . '&startdt=' . rawurlencode( $o_start ) . '&enddt=' . rawurlencode( $o_end );
+			if ( $is_all_day )  $outlook .= '&allday=true';
+			if ( $description ) $outlook .= '&body=' . $desc_enc;
+			if ( $location )    $outlook .= '&location=' . $loc_enc;
 
 			// Office 365
-			$office365 = 'https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent';
-			$office365 .= '&subject=' . $title_encoded;
-			$office365 .= '&startdt=' . rawurlencode( $outlook_start );
-			$office365 .= '&enddt=' . rawurlencode( $outlook_end );
-			if ( $is_all_day ) {
-				$office365 .= '&allday=true';
-			}
-			if ( ! empty( $description ) ) {
-				$office365 .= '&body=' . $desc_encoded;
-			}
-			if ( ! empty( $location ) ) {
-				$office365 .= '&location=' . $location_encoded;
-			}
+			$office365 = 'https://outlook.office.com/calendar/0/deeplink/compose?path=/calendar/action/compose&rru=addevent&subject=' . $title_enc . '&startdt=' . rawurlencode( $o_start ) . '&enddt=' . rawurlencode( $o_end );
+			if ( $is_all_day )  $office365 .= '&allday=true';
+			if ( $description ) $office365 .= '&body=' . $desc_enc;
+			if ( $location )    $office365 .= '&location=' . $loc_enc;
 
-			// Yahoo Calendar
-			$yahoo_start = $is_all_day ? $start->format( 'Ymd' ) : $start_utc->format( 'Ymd\THis\Z' );
-			$yahoo_end = $is_all_day ? $end->format( 'Ymd' ) : $end_utc->format( 'Ymd\THis\Z' );
+			// Yahoo
+			$yahoo = 'https://calendar.yahoo.com/?v=60&title=' . $title_enc;
+			$yahoo .= '&st=' . ( $is_all_day ? $start->format( 'Ymd' ) : $start_utc->format( 'Ymd\THis\Z' ) );
+			$yahoo .= '&et=' . ( $is_all_day ? $end->format( 'Ymd' ) : $end_utc->format( 'Ymd\THis\Z' ) );
+			if ( $is_all_day )  $yahoo .= '&dur=allday';
+			if ( $description ) $yahoo .= '&desc=' . $desc_enc;
+			if ( $location )    $yahoo .= '&in_loc=' . $loc_enc;
 
-			$yahoo = 'https://calendar.yahoo.com/?v=60';
-			$yahoo .= '&title=' . $title_encoded;
-			$yahoo .= '&st=' . $yahoo_start;
-			$yahoo .= '&et=' . $yahoo_end;
-			if ( $is_all_day ) {
-				$yahoo .= '&dur=allday';
-			}
-			if ( ! empty( $description ) ) {
-				$yahoo .= '&desc=' . $desc_encoded;
-			}
-			if ( ! empty( $location ) ) {
-				$yahoo .= '&in_loc=' . $location_encoded;
-			}
-
-			// ICS file via calndr.link API
-			$ics_params = array(
-				'title' => $title,
-				'start' => $is_all_day ? $start->format( 'Y-m-d' ) : $start_utc->format( 'Y-m-d\TH:i:s\Z' ),
-				'end'   => $is_all_day ? $end->format( 'Y-m-d' ) : $end_utc->format( 'Y-m-d\TH:i:s\Z' ),
-			);
-			if ( ! empty( $description ) ) {
-				$ics_params['description'] = substr( $description, 0, 500 );
-			}
-			if ( ! empty( $location ) ) {
-				$ics_params['location'] = $location;
-			}
-			if ( $is_all_day ) {
-				$ics_params['allDay'] = 'true';
-			}
-
-			$ics = 'https://calndr.link/d/event/?' . http_build_query( $ics_params );
+			// ICS via calndr.link
+			$ics_params = array( 'title' => $title, 'start' => $is_all_day ? $start->format( 'Y-m-d' ) : $start_utc->format( 'Y-m-d\TH:i:s\Z' ), 'end' => $is_all_day ? $end->format( 'Y-m-d' ) : $end_utc->format( 'Y-m-d\TH:i:s\Z' ) );
+			if ( $description ) $ics_params['description'] = substr( wp_strip_all_tags( $description ), 0, 500 );
+			if ( $location )    $ics_params['location'] = $location;
+			if ( $is_all_day )  $ics_params['allDay'] = 'true';
 
 			return array(
 				'google'    => $google,
 				'outlook'   => $outlook,
 				'office365' => $office365,
 				'yahoo'     => $yahoo,
-				'ics'       => $ics,
+				'ics'       => 'https://calndr.link/d/event/?' . http_build_query( $ics_params ),
 			);
 		}
 
@@ -1213,17 +1095,36 @@ function init_plugin(): void {
 
 		/**
 		 * Render add-to-calendar dropdown button.
+		 * Pulls event data from MotoPress Calendar and builds URLs dynamically.
 		 */
 		public function render_addtocal_buttons( int $event_group_id ): string {
-			$google    = get_post_meta( $event_group_id, '_mpcal_atc_google', true );
-			$outlook   = get_post_meta( $event_group_id, '_mpcal_atc_outlook', true );
-			$office365 = get_post_meta( $event_group_id, '_mpcal_atc_office365', true );
-			$yahoo     = get_post_meta( $event_group_id, '_mpcal_atc_yahoo', true );
-			$ics       = get_post_meta( $event_group_id, '_mpcal_atc_ics', true );
-
-			if ( empty( $google ) && empty( $outlook ) ) {
+			if ( ! class_exists( 'Motopress_Calendar\Motopress_Calendar' ) ) {
 				return '';
 			}
+
+			$event_group = \Motopress_Calendar\Motopress_Calendar::get_events_api()->get_event_group_by_id( $event_group_id );
+			if ( null === $event_group ) {
+				return '';
+			}
+
+			$wp_tz    = wp_timezone();
+			$now      = new \DateTime( 'now', $wp_tz );
+			$result   = \Motopress_Calendar\Core\Event_Search_Helper::find_upcoming_group_events( $event_group_id, $now, 1 );
+			$events   = $result->get_events();
+			$event    = ! empty( $events ) ? $events[0] : null;
+
+			if ( null === $event ) {
+				return '';
+			}
+
+			$title       = $event_group->get_event_title();
+			$description = $event_group->get_event_description();
+			$start       = $event->get_start_in_wp_timezone();
+			$end         = $event->get_end_in_wp_timezone();
+			$is_all_day  = $event->is_all_day_event();
+			$location    = $event->get_event_location() ? $event->get_event_location()->get_title() : '';
+
+			$urls = $this->build_calendar_urls( $title, $description, $start, $end, $is_all_day, $location );
 
 			$html  = '<div class="mpcal-atc-wrap">';
 			$html .= '<button type="button" class="mpcal-atc-btn" onclick="this.parentElement.classList.toggle(\'open\')">';
@@ -1234,11 +1135,11 @@ function init_plugin(): void {
 			$html .= '<div class="mpcal-atc-dropdown">';
 
 			$links = array(
-				array( 'url' => $google,    'label' => 'Google Calendar', 'icon' => 'google' ),
-				array( 'url' => $office365, 'label' => 'Microsoft 365',  'icon' => 'office365' ),
-				array( 'url' => $outlook,   'label' => 'Outlook.com',    'icon' => 'outlook' ),
-				array( 'url' => $yahoo,     'label' => 'Yahoo Calendar', 'icon' => 'yahoo' ),
-				array( 'url' => $ics,       'label' => 'Apple / iCal',   'icon' => 'apple' ),
+				array( 'url' => $urls['google'],    'label' => 'Google Calendar', 'icon' => 'google' ),
+				array( 'url' => $urls['office365'], 'label' => 'Microsoft 365',  'icon' => 'office365' ),
+				array( 'url' => $urls['outlook'],   'label' => 'Outlook.com',    'icon' => 'outlook' ),
+				array( 'url' => $urls['yahoo'],     'label' => 'Yahoo Calendar', 'icon' => 'yahoo' ),
+				array( 'url' => $urls['ics'],       'label' => 'Apple / iCal',   'icon' => 'apple' ),
 			);
 
 			foreach ( $links as $link ) {
