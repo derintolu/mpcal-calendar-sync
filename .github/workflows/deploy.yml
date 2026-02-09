@@ -1,0 +1,15 @@
+name: Deploy to Production
+
+on:
+  push:
+    branches:
+      - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger plugin update on myhub21
+        run: |
+          curl -s -o /dev/null -w "%{http_code}" \
+            "https://myhub21.com/wp-json/dfg/v1/package_update?secret=a83677c2382d2abd3d10c119b10171e49c9329027aa47ba5f3c42b94d39f731a&type=plugin&package=mpcal-calendar-sync"
